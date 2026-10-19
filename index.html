@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Studio AI Voiceover Generator</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      justify-content: center;
+      padding: 40px 20px;
+      margin: 0;
+    }
+    .app-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      max-width: 700px;
+      width: 100%;
+    }
+    h2 {
+      margin-top: 0;
+      color: #38bdf8;
+      text-align: center;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      font-weight: 600;
+      display: block;
+      margin-bottom: 8px;
+      color: #94a3b8;
+    }
+    select, textarea {
+      width: 100%;
+      padding: 12px;
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 15px;
+      box-sizing: border-box;
+    }
+    textarea {
+      height: 150px;
+      resize: vertical;
+    }
+    .btn-group {
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-generate {
+      background-color: #0284c7;
+      color: white;
+    }
+    .btn-generate:hover {
+      background-color: #0369a1;
+    }
+    .btn-download {
+      background-color: #10b981;
+      color: white;
+      display: none;
+    }
+    .btn-download:hover {
+      background-color: #059669;
+    }
+    #status {
+      margin-top: 15px;
+      font-size: 14px;
+      color: #38bdf8;
+      text-align: center;
+    }
+    .audio-section {
+      margin-top: 20px;
+    }
+    audio {
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-card">
+    <h2>🎙️ AI Voiceover Studio (Unlimited)</h2>
+    
+    <div class="form-group">
+      <label for="voiceSelect">Select Voice / Speaker:</label>
+      <select id="voiceSelect">
+        <option value="">Loading high-quality voices...</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="textInput">Script (Hindi, English, Gujarati, Hinglish):</label>
+      <textarea id="textInput" placeholder="Yahan apni script type ya paste karein..."></textarea>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn-generate" onclick="generateSpeech()">Generate & Play Audio</button>
+      <button id="downloadBtn" class="btn-download" onclick="downloadAudio()">📥 Download Audio File</button>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="audio-section" id="audioSection" style="display:none;">
+      <audio id="audioPlayer" controls></audio>
+    </div>
+  </div>
+
+  <script>
+    let voices = [];
+    let audioBlob = null;
+    let audioUrl = null;
+    const voiceSelect = document.getElementById('voiceSelect');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    function populateVoices() {
+      voices = window.speechSynthesis.getVoices();
+      voiceSelect.innerHTML = '';
+
+      const preferredLangs = ['hi-IN', 'gu-IN', 'en-IN', 'en-US'];
+      
+      let filteredVoices = voices.filter(voice => 
+        preferredLangs.some(lang => voice.lang.includes(lang))
+      );
+
+      if(filteredVoices.length === 0) filteredVoices = voices;
+
+      filteredVoices.forEach((voice) => {
+        const option = document.createElement('option');
+        option.textContent = `${voice.name} (${voice.lang})`;
+        option.setAttribute('data-lang', voice.lang);
+        option.setAttribute('data-name', voice.name);
+        voiceSelect.appendChild(option);
+      });
+    }
+
+    populateVoices();
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = populateVoices;
+    }
+
+    function generateSpeech() {
+      const text = document.getElementById('textInput').value.trim();
+      const status = document.getElementById('status');
+      
+      if (!text) {
+        alert('Kripya pehle apni script likhein!');
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+      downloadBtn.style.display = "none";
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      const selectedOption = voiceSelect.selectedOptions[0].getAttribute('data-name');
+
+      const selectedVoice = voices.find(voice => voice.name === selectedOption);
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+
+      // Voice Audio Synthesis
+      utterance.onstart = () => {
+        status.innerText = "🔊 Generating and playing voiceover...";
+      };
+
+      utterance.onend = () => {
+        status.innerText = "✅ Voiceover complete! Click below to download.";
+        
+        // Google TTS Free Downloader Link Backup (for Direct File Download)
+        const langCode = selectedVoice ? selectedVoice.lang : 'hi-IN';
+        const cleanText = encodeURIComponent(text);
+        audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${cleanText}&tl=${langCode}&client=tw-ob`;
+        
+        downloadBtn.style.display = "block";
+      };
+
+      utterance.onerror = (e) => {
+        status.innerText = "❌ Error in audio playback.";
+      };
+
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function downloadAudio() {
+      if (audioUrl) {
+        const a = document.createElement('a');
+        a.href = audioUrl;
+        a.target = '_blank';
+        a.download = 'voiceover.mp3';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    }
+async function downloadAudio() {
+  const status = document.getElementById('status');
+  if (!audioUrl) return;
+
+  status.innerText = "⏳ Preparing MP3 download...";
+
+  try {
+    // Audio blob fetch kar rahe hain direct download ke liye
+    const response = await fetch(audioUrl);
+    const blob = await response.blob();
+    
+    // Downloadable URL URL create kar rahe hain
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = 'voiceover.mp3'; // Direct download filename
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+
+    status.innerText = "✅ MP3 File successfully downloaded!";
+  } catch (error) {
+    // Agar CORS restriction ki wajah se direct fetch na ho, toh alternative download trigger
+    const a = document.createElement('a');
+    a.href = audioUrl;
+    a.download = 'voiceover.mp3';
+    a.click();
+    status.innerText = "⚠️ Download started. Right-click audio and select 'Save audio as...' if needed.";
+  }
+}
+  </script>
+
+</body>
+</html>
+
+
+
+
+
+
+
+
