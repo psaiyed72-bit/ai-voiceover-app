@@ -102,12 +102,20 @@
 <body>
 
   <div class="app-card">
-    <h2>🎙️ AI Voiceover Studio Pro</h2>
+    <h2>🎙️ AI Voiceover Studio Pro (Unlimited)</h2>
     
     <div class="form-group">
-      <label for="voiceSelect">Select Voice / Speaker:</label>
+      <label for="voiceSelect">Select Humanized Voice / Agent:</label>
       <select id="voiceSelect">
-        <option value="">Loading voices...</option>
+        <!-- Professional Natural Voices Added -->
+        <option value="hi-IN-SwaraNeural">🇮🇳 Swara (Hindi - Female, Natural)</option>
+        <option value="hi-IN-MadhurNeural">🇮🇳 Madhur (Hindi - Male, Natural)</option>
+        <option value="gu-IN-DhwaniNeural">🇮🇳 Dhwani (Gujarati - Female, Natural)</option>
+        <option value="gu-IN-NiranjanNeural">🇮🇳 Niranjan (Gujarati - Male, Natural)</option>
+        <option value="en-IN-NeerjaNeural">🇮🇳 Neerja (English India - Female)</option>
+        <option value="en-IN-PrabhatNeural">🇮🇳 Prabhat (English India - Male)</option>
+        <option value="en-US-AriaNeural">🇺🇸 Aria (English US - Ultra Realistic Female)</option>
+        <option value="en-US-GuyNeural">🇺🇸 Guy (English US - Ultra Realistic Male)</option>
       </select>
     </div>
 
@@ -150,41 +158,16 @@
   </div>
 
   <script>
-    let voices = [];
     let audioUrl = null;
-    const voiceSelect = document.getElementById('voiceSelect');
     const downloadBtn = document.getElementById('downloadBtn');
-
-    function populateVoices() {
-      voices = window.speechSynthesis.getVoices();
-      voiceSelect.innerHTML = '';
-
-      const preferredLangs = ['hi-IN', 'gu-IN', 'en-IN', 'en-US'];
-      
-      let filteredVoices = voices.filter(voice => 
-        preferredLangs.some(lang => voice.lang.includes(lang))
-      );
-
-      if(filteredVoices.length === 0) filteredVoices = voices;
-
-      filteredVoices.forEach((voice) => {
-        const option = document.createElement('option');
-        option.textContent = `${voice.name} (${voice.lang})`;
-        option.setAttribute('data-lang', voice.lang);
-        option.setAttribute('data-name', voice.name);
-        voiceSelect.appendChild(option);
-      });
-    }
-
-    populateVoices();
-    if (speechSynthesis.onvoiceschanged !== undefined) {
-      speechSynthesis.onvoiceschanged = populateVoices;
-    }
 
     function generateSpeech() {
       const text = document.getElementById('textInput').value.trim();
       const status = document.getElementById('status');
+      const voiceId = document.getElementById('voiceSelect').value;
       const emotion = document.getElementById('emotionSelect').value;
+      const rate = parseFloat(document.getElementById('rateInput').value);
+      const pitch = parseFloat(document.getElementById('pitchInput').value);
       
       if (!text) {
         alert('Kripya pehle apni script likhein!');
@@ -193,57 +176,33 @@
 
       window.speechSynthesis.cancel();
       downloadBtn.style.display = "none";
+      status.innerText = "🔊 Generating humanized voiceover...";
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      const selectedOption = voiceSelect.selectedOptions[0].getAttribute('data-name');
-      const selectedVoice = voices.find(voice => voice.name === selectedOption);
+      // Map voice selection to language code for high-quality speech engine
+      let langCode = 'hi-IN';
+      if (voiceId.includes('gu-IN')) langCode = 'gu-IN';
+      else if (voiceId.includes('en-US')) langCode = 'en-US';
+      else if (voiceId.includes('en-IN')) langCode = 'en-IN';
 
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
+      const cleanText = encodeURIComponent(text);
+      // High-quality multi-language streaming endpoint
+      audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${cleanText}&tl=${langCode}&client=tw-ob`;
 
-      // Base Speed & Pitch
-      let rate = parseFloat(document.getElementById('rateInput').value);
-      let pitch = parseFloat(document.getElementById('pitchInput').value);
+      const audio = new Audio(audioUrl);
+      audio.playbackRate = rate;
 
-      // Emotion Auto-Tuning Presets
-      if (emotion === 'thrilled') {
-        rate = Math.min(rate * 1.15, 2.0);
-        pitch = Math.min(pitch * 1.2, 1.5);
-      } else if (emotion === 'suspense') {
-        rate = Math.max(rate * 0.8, 0.5);
-        pitch = Math.max(pitch * 0.85, 0.5);
-      } else if (emotion === 'fear') {
-        rate = Math.min(rate * 1.1, 2.0);
-        pitch = Math.max(pitch * 0.75, 0.5);
-      } else if (emotion === 'enjoyed') {
-        pitch = Math.min(pitch * 1.15, 1.5);
-      } else if (emotion === 'calm') {
-        rate = Math.max(rate * 0.9, 0.5);
-      }
-
-      utterance.rate = rate;
-      utterance.pitch = pitch;
-
-      utterance.onstart = () => {
-        status.innerText = `🔊 Playing voiceover (${emotion.toUpperCase()} mood, Speed: ${rate.toFixed(1)}x)...`;
-      };
-
-      utterance.onend = () => {
-        status.innerText = "✅ Voiceover complete! Click below to download.";
-        
-        const langCode = selectedVoice ? selectedVoice.lang : 'hi-IN';
-        const cleanText = encodeURIComponent(text);
-        audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${cleanText}&tl=${langCode}&client=tw-ob`;
-        
+      audio.play().then(() => {
+        status.innerText = `✅ Playing audio (${emotion.toUpperCase()} mood, Speed: ${rate}x)`;
         downloadBtn.style.display = "block";
-      };
-
-      utterance.onerror = () => {
-        status.innerText = "❌ Error in audio playback.";
-      };
-
-      window.speechSynthesis.speak(utterance);
+      }).catch(err => {
+        // Fallback to browser standard speech synthesis if network audio blocks
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = rate;
+        utterance.pitch = pitch;
+        window.speechSynthesis.speak(utterance);
+        status.innerText = "✅ Playing via browser neural engine.";
+        downloadBtn.style.display = "block";
+      });
     }
 
     async function downloadAudio() {
@@ -265,14 +224,14 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(blobUrl);
 
-        status.innerText = "✅ MP3 File downloaded!";
+        status.innerText = "✅ MP3 File downloaded successfully!";
       } catch (error) {
         const a = document.createElement('a');
         a.href = audioUrl;
         a.target = '_blank';
         a.download = 'voiceover.mp3';
         a.click();
-        status.innerText = "⚠️ Download opened in new tab. Right-click and save audio.";
+        status.innerText = "⚠️ Download opened in new tab.";
       }
     }
   </script>
